@@ -1,0 +1,112 @@
+#!/bin/env bash
+
+shopt -s globstar extglob
+
+: ${PROJ_ROOT:=$WORKSPACE_ROOT}  ${PROJ_DIR:=$(readlink -e $CLIFDEN_BIN/..)} ${PROJ_BIN:=$CLIFDEN_BIN} ${PROJ_RUN:=$(readlink -e $CLIFDEN_BIN/../run)}
+
+export SIMENV_LOCAL_DIR=$PROJ_RUN/.$(basename $0)
+export SIMENV_LIB=$(dirname $0)/simenv_sublib
+
+function usage
+{
+  cat <<USAGE | sed -r	'
+			s/simenv/\\e[1m&\\e[0m/
+			s/(- )([[:alnum:]_]+)/\1\\e[1m\2\\e[0m/
+			s/subcmd|args/\\e[4m&\\e[0m/g
+			s/(s)(:)/\\e[1m\1\\e[0m\2/
+			s/.*/echo -e "&"/e
+			'
+usage: simenv [-x] [--help|-h] subcmd [args]
+       simenv help subcmd
+
+  supported subcmds:
+
+$(grep '# Function:' $SIMENV_LIB | grep -o '\S\+$' | sed 's/.*/       - &/') 
+
+USAGE
+
+exit ${1:-0}
+}
+
+
+# Function: get_local
+#
+function get_local
+{
+  echo $SUB_DIR
+}
+
+# Function: get_bin_dir
+#
+function get_bin_dir
+{
+  echo $PROJ_BIN
+}
+
+if ((!$#)); then
+  usage
+fi
+
+# simenv options
+while (($#)); do
+  case $1 in
+    -?(-)help|-h)
+      usage
+      ;;
+
+    -x) setx=1
+	shift
+	;;
+
+    -*) echo -e "\e[1;31m-E-\e[0m Unknown option '\e[1m$1\e[0m'\n"
+	usage 1
+	;;
+
+    [[:alpha:]]*)
+	break
+	;;
+
+    *)	echo -e "\e[1;31m-E-\e[0m Incorrect subcommand name '\e[31m$1\e[0m'. Subcommand names should start with a letter"
+	exit 2
+	;;	
+  esac
+done
+
+if ((!$#)); then
+  echo -e  "\e[1;31m-E-\e[0m No subcommand provided\n"
+  usage 2
+fi
+
+trap rm_subdir EXIT
+
+# Function:
+# 
+# To remove subcommands tempory working directories
+#
+function rm_subdir
+{
+  #echo "Removing SUBDIR '$SUB_DIR'"
+  rm -rf $SUB_DIR
+}
+
+
+sub=$1
+shift
+
+# Loading all the subcommands' library
+source $SIMENV_LIB
+
+if [[ $(type -t _$sub) == function ]]; then
+  SUB_DIR=$(mktemp -u -d XXXXXXXX -p$SIMENV_LOCAL_DIR/$sub)
+  mkdir -p $SUB_DIR
+
+  if ((setx)); then
+    set -x
+    unset setx
+  fi
+
+  _$sub	"$@"
+else
+  echo -e "\e[1;31m-E-\e[0m Unknown subcommand '\e[1m$sub\e[0m'"
+  exit 1
+fi
