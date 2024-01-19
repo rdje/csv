@@ -5200,10 +5200,12 @@ function _log_regaccess_to_csv
     echo
     echo "Options:"
     echo
-    echo "  -h, --help		      show this help message and exit"
-    echo "  --regf  <reg_field> reg_field file"
+    echo "  -h, --help		           show this help message and exit"
+    echo "  -q, --quiet              Suppress output messages"
+    echo "      --regf  <reg_field>  reg_field file"
+    echo "      --xls                generate excel file"
     echo 
-    echo "  <log>...		        log file(s), may also be provided via /dev/stdin"
+    echo "  <log>...		             log file(s), may also be provided via /dev/stdin"
     echo
     echo "Caveat:"
     echo "  Simulations must be run with at least UVM_MEDIUM"
@@ -5211,7 +5213,7 @@ function _log_regaccess_to_csv
     exit ${1:-0}
   }
 
-  opt=$(getopt -a -oh  -lhelp,regf: --  "$@")
+  opt=$(getopt -a -oh,q  -lhelp,quiet,regf:,xls --  "$@")
   if (($?)); then
     usage 1
   fi
@@ -5224,6 +5226,11 @@ function _log_regaccess_to_csv
           usage
           ;;
 
+      -q|--quiet)
+          quiet=1
+          shift
+          ;;
+
       --regf)
         reg_field=$(readlink -e $2)
         if [[ -z $reg_field ]]; then
@@ -5232,6 +5239,11 @@ function _log_regaccess_to_csv
         fi
   
         shift 2
+        ;;
+
+      --xls)
+        xls=1
+        shift
         ;;
 
       --) shift
@@ -5299,29 +5311,41 @@ function _log_regaccess_to_csv
         local fval=$((~(~0 << $size) & ($val >> $offset)))
 
         echo $name:$(printf "%0X" $fval)
-      done  | paste -s
+      done  | paste -s | sed -r 's/\t/,/g'
     }
 
     #echo -e "$timestamp\t$old_scope\t$scope\t$slice\t$reg\t$val"
-    echo -e "$timestamp\t$scope\t$slice\t$reg\t$(printf "0x%0X" $val)\t$(fields $scope $reg $val)"
+    echo -e "$timestamp,$scope,$slice,$reg,$(printf "0x%0X" $val),$(fields $scope $reg $val)"
   }
 
   export -f proc
 
   for log in ${args[@]}; do
-    echo Processing $log
+    if ((quiet)); then
+      echo Processing $log 1>&2
+    fi
 
-    local testname=$(dirname $log | xargs basename)
-    local crfdir=$(dirname $log | xargs dirname | xargs dirname | xargs dirname)
-    local crfdirname=$(basename $crfdir)
+    local testname=$(simenv testname $log)
+    local iter=$(simenv testiter $log)
+    local csv=${testname}${iter:+_$iter}.csv
 
 
-    echo -e "sep=\t"  > $crfdir/${crfdirname}__${testname}__regaccess.csv
-    grep ' \[RAL_WRITE' $log | sed -rn 's/^UVM_INFO @ ([[:digit:]]+) .+ adc_ral_h0\.(\w+)\.([A-Z0-9_]+): Write Data .+ = (0x[[:xdigit:]]+); .+/proc \1 \2 \3 \4/ep' >> $crfdir/${crfdirname}__${testname}__regaccess.csv
+    grepout=$(grep ' \[RAL_WRITE' $log | sed -rn 's/^UVM_INFO @ ([[:digit:]]+) .+ adc_ral_h0\.(\w+)\.([A-Z0-9_]+): Write Data .+ = (0x[[:xdigit:]]+); .+/proc \1 \2 \3 \4/ep')
 
-    fields_header=$(seq -f "FIELD %.0f" 1 $(($(tail -n +3 $crfdir/${crfdirname}__${testname}__regaccess.csv | sed -n 's/.*/echo "&" | wc -w/ep' | sort -nru | head -1) -5)) | paste -s)
+    if [[ -z $grepout ]]; then
+      echo -e "\e[1;31m-W-\e[0m No register access found in $log" 1>&2
+    else
+      > $csv
+      echo "$grep" >> $csv
 
-    sed -i "2 i TIMESTAMP\tSCOPE\tSLICE\tREGISTER\tVALUE\t$fields_header" $crfdir/${crfdirname}__${testname}__regaccess.csv
+      fields_header=$(seq -f "FIELD %.0f" 1 $(($(tail -n +3 $csv | sed -r 's/.*/echo "&" | grep -Po , | wc -l/ep' | sort -run | head -1) -5 +1)) | paste -s | sed -r 's/\t/,/g')
+
+      sed -i "1 i TIMESTAMP,SCOPE,SLICE,REGISTER,VALUE,$fields_header" $csv
+
+      if ((xls)); then
+        simenv csv_2xls $csv -quiet
+      fi
+    fi
   done
 
 }
@@ -5367,24 +5391,48 @@ function _regaccess_to_csv
       
       *) dir=$1
          shift
+
+         if [[ ! -d $dir ]]; then
+           if [[ -f $dir ]]; then
+             echo -e "\e[1;31m-E-\e[0m '$dir' is a file not a directory"
+             usage 1
+           fi
+
+           echo -e "\e[1;31m-E-\e[0m Directory '$dir' not found"
+           usage 2
+         fi
          ;;
     esac
   done
 
   local dir=${dir:-$PWD}
 
-  cd $SUB_DIR
-
   echo
   echo -n "Generating the reg_field map.. "
-  simenv reg_field_list > reg_field
+  simenv reg_field_list > $SUB_DIR/reg_field
 
   echo Done.
   echo
+
+  mkdir -p _csv
+  cd _csv
+  rm -f *.csv
+
+  csvfiles=()
   for log in $(simenv file -d $dir run.log); do
+    testname=$(simenv testname $log)
+    iter=$(simenv testiter $log)
+    csv=${testname}${iter:+_$iter}.csv
+
     echo Processing $log
-    simenv log_regaccess_to_csv -regf reg_field $log
+    simenv log_regaccess_to_csv -quiet -regf $SUB_DIR/reg_field $log
+
+    if [[ -f $csv ]]; then
+      csvfiles+=($csv)
+    fi
   done
+
+  simenv csv_2xls -m -o ../$(basename $PWD)__regaccess_$(date +%Y%m%d_%H%M%S).xlsx ${csvfiles[@]}
 }
  
 # Function: regr_status
@@ -7299,7 +7347,7 @@ function _csv_2xls
     rm sheets.xml *.fods
   else
     soffice --headless  --convert-to xlsx:"Calc MS Excel 2007 XML"  --infilter=CSV:44,34,UTF8,true  ${csv[@]}
-  fi
+  fi | if ((quiet)); then cat 1>&2 >/dev/null; else cat; fi
 }
 
 # Function: status
@@ -7371,19 +7419,22 @@ function _rerun
 {
   function usage
   {
-    echo "Usage: rerun [options] <log>"
+    echo "Usage: rerun [options] [<log>]"
     echo
     echo "Options:"
     echo "  -h, --help     show this help message and exit"
     echo
     echo "Arguments:"
-    echo "  <log>          Log file to process"
+    echo "  <log>          Log file to process, or /dev/stdin if not specified"
+    echo
 
     exit ${1:-0}
   }
 
   if ((!$#)); then
-    usage 1
+    if [[ ! -p /dev/stdin ]]; then
+      usage 1
+    fi
   fi
 
   opt=$(getopt -a -oh -lhelp -- "$@")
@@ -7420,11 +7471,20 @@ function _rerun
     fi
 
     log=$(readlink -e $log)
+  elif [[ -p /dev/stdin ]]; then
+    log=$(cat)
+
+    if [[ -z $log ]]; then
+      echo -e "\e[1;31m-E-\e[0m No log file provided"
+      usage 1
+    elif [[ ! -f $log ]]; then
+      echo -e "\e[1;31m-E-\e[0m No such file: \e[1m$log\e[0m"
+      usage 1
+    fi
   else
     echo -e "\e[1;31m-E-\e[0m No log file provided"
     usage 1
   fi
-
 
 
   testname=$(simenv testname $log)
@@ -9218,3 +9278,53 @@ function _samples_status
 
   popd > /dev/null
 }
+
+# Function: matlab_cfg_table
+# 
+function _matlab_cfg_table
+{
+  table=$(readlink -e $1)
+
+  cdir=$PWD
+
+  pushd $SUB_DIR > /dev/null
+
+  tail -n +3 $table | \
+  sed -r '
+    /^\+/i\\n
+    s/^\|\s+|\s+\|$//g
+    s/\|\|/_LOGICAL_OR_/g
+    s/,/_COMMA_/g
+    s/\$/_DOLLAR_/g
+  '  | sed -r '/^\+/d' | \
+
+  sed -rn '
+    /^[[:digit:]]+/ {
+      s/^([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]*)/echo "\1" > 1; echo "\2" > 2;  echo "\3" > 3; echo "\4" > 4; echo "\5" > 5/e
+
+      :next
+      n
+      /^\s*$/ ! {
+        s/^([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)/echo "\1" >> 1; echo "\2" >> 2;  echo "\3" >> 3; echo "\4" >> 4; echo "\5" >> 5/e
+        
+        b next 
+      }
+      
+      s/.*/echo "\"$(paste -s 1)\",\\\"$(paste -s 2)\\\",\\\"$(paste -s 3)\\\",\\\"$(paste -s 4)\\\",\\\"$(paste -s 5)\\\""/ep
+    }
+  ' | sed -r '
+    s/_COMMA_/,/g
+    s/_DOLLAR_/$/g
+    s/_LOGICAL_OR_/||/g
+  ' > $cdir/matlab_cfg_table.csv
+
+  popd > /dev/null
+
+  sed -i -r 's/\s+"/"/g; s/\s+,/,/g' matlab_cfg_table.csv
+
+  sed -i -r '1iID,Field,RTL signal,Relation to Matlab configuration,Comment' matlab_cfg_table.csv
+
+  simenv csv_2xls matlab_cfg_table.csv
+}
+
+
