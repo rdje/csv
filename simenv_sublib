@@ -1839,7 +1839,7 @@ USAGE
 
     # Default
     *)  case $project in
-          s70*|clifden*|ws*)
+          s70*|clifden*|ws*|shadow*)
             lsf_spec='"select[type==X86_64 && ostype==rhelws79]"'
             ;;
 
@@ -4241,9 +4241,9 @@ function _fft_log
 }
 
 
-# Function: cal_status_ra
+# Function: cal_status_ra_offset_gain
 #
-function _cal_status_ra
+function _cal_status_ra_offset_gain
 {
   if [[ -z $1 ]]; then
     echo -e "ERROR [CAL_STATUS_RA] Missing log file" 1>&2
@@ -4251,29 +4251,11 @@ function _cal_status_ra
   fi
 
   local log=$(readlink -e $1)
-
-  if [[ $2 ]]; then
-    local opath=$(readlink -f $2)
-
-    if [[ $opath ]]; then
-            local opath_dir=$(dirname $opath)
-            local opath_base=$(basename $opath)
-
-    else
-      echo "ERROR [CAL_STATUS_RA] Directory path doesn't exist" 1>&2
-      exit 1
-    fi
-
-    export csv=$(readlink -f $2)__ra_offset_gain.csv
-  else
-    local crf_rundir=$(sed -rn 's#.+/([^/]+)/simulation/.+#\1#p' <<<$log)
-    export csv=$PWD/${crf_rundir}__$(dirname $log | xargs basename)__ra_offset_gain.csv
-  fi
+  export csv=$PWD/ra_offset_gain.csv
 
   echo "INFO [CAL_STATUS_RA] Processing file $1 .." 1>&2
 
-  echo "sep=,"  > $csv
-  echo "RESIDUE CODE,RESIDUE ERROR,TOLERANCE,CORRECTION VAL,ERROR VAL,CODE,STEP SIZE,PATH" >> $csv
+  echo "STATUS,RESIDUE CODE,RESIDUE ERROR,TOLERANCE,CORRECTION VAL,ERROR VAL,CODE,STEP SIZE,PATH" > $csv
   function parse
   {
     local data=$1
@@ -4290,12 +4272,18 @@ function _cal_status_ra
     local      step_size=${cal_status[6]}
     local           path=${cal_status[7]}
 
+    if (( $(echo "scale=2; ${residue_code#-} >= $tolerance" | bc) )); then
+      local status="FAIL"
+    else
+      local status="PASS"
+    fi
+
     #echo -e "--------------------------------"
     #for s in ${cal_status[*]}; do
     #  echo "<$s>"
     #done
     #echo -e "--------------------------------\n"
-    echo "$residue_code,$residue_error,$tolerance,$correction_val,$error_val,$code,$step_size,$path"
+    echo "$status,$residue_code,$residue_error,$tolerance,$correction_val,$error_val,$code,$step_size,$path"
 
   } >> $csv
 
@@ -4317,18 +4305,11 @@ function _cal_status_comp_offset
   fi
 
   local log=$(readlink -e $1)
-
-  if [[ $2 ]]; then
-    export csv=$PWD/$(dirname $2 | xargs basename)__comp_offset.csv
-  else
-    local crf_rundir=$(sed -rn 's#.+/([^/]+)/simulation/.+#\1#p' <<<$log)
-    export csv=$PWD/${crf_rundir}__$(dirname $log | xargs basename)__comp_offset.csv
-  fi
+  export csv=$PWD/comp_offset.csv
 
   echo "INFO [CAL_STATUS_COMP_OFFSET] Processing file $1 .." 1>&2
 
-  echo "sep=," >$csv
-  echo "RESIDUE CODE,RESIDUE ERROR,TOLERANCE,IDEAL,ACTUAL,INJECTED ERROR,COARSE CODE,FINE CODE,COARSE STEP,FINE STEP,PATH,CALIBRATION BYPASS" >>$csv
+  echo "STATUS,RESIDUE CODE,RESIDUE ERROR,TOLERANCE,IDEAL,ACTUAL,INJECTED ERROR,COARSE CODE,FINE CODE,COARSE STEP,FINE STEP,PATH,CALIBRATION BYPASS" >$csv
   function parse
   {
     local data=$1
@@ -4354,12 +4335,18 @@ function _cal_status_comp_offset
     local           path=${cal_status[10]}
     local     cal_bypass=${cal_status[11]}
 
+    if (( $(echo "scale=2; ${residue_code#-} >= $tolerance" | bc) )); then
+      local status="FAIL"
+    else
+      local status="PASS"
+    fi
+
     #echo -e "--------------------------------"
     #for s in ${cal_status[*]}; do
     #  echo "<$s>"
     #done
     #echo -e "--------------------------------\n"
-    echo "$residue_code,$residue_error,$tolerance,$ideal,$actual,$injected_error,$coarse_code,$fine_code,$coarse_step,$fine_step,$path,$cal_bypass"
+    echo "$status,$residue_code,$residue_error,$tolerance,$ideal,$actual,$injected_error,$coarse_code,$fine_code,$coarse_step,$fine_step,$path,$cal_bypass"
 
   } >> $csv
 
@@ -4383,18 +4370,11 @@ function _cal_status_latch_offset
   fi
 
   local log=$(readlink -e $1)
-
-  if [[ $2 ]]; then
-    export csv=$PWD/$(dirname $2 | xargs basename)__latch_offset.csv
-  else
-    local crf_rundir=$(sed -rn 's#.+/([^/]+)/simulation/.+#\1#p' <<<$log)
-    export csv=$PWD/${crf_rundir}__$(dirname $log | xargs basename)__latch_offset.csv
-  fi
+  export csv=$PWD/latch_offset.csv
 
   echo "INFO [CAL_STATUS_LATCH_OFFSET] Processing file $1 .." 1>&2
 
-  echo "sep=," >$csv
-  echo "RESIDUE CODE,RESIDUE ERROR,TOLERANCE,IDEAL,ACTUAL,INJECTED ERROR,LATCH CODE,LATCH STEP,PATH,CALIBRATION BYPASS" >>$csv
+  echo "STATUS,RESIDUE CODE,RESIDUE ERROR,TOLERANCE,IDEAL,ACTUAL,INJECTED ERROR,LATCH CODE,LATCH STEP,PATH,CALIBRATION BYPASS" >$csv
   function parse
   {
     local data=$1
@@ -4418,12 +4398,18 @@ function _cal_status_latch_offset
     local           path=${cal_status[8]}
     local     cal_bypass=${cal_status[9]}
 
+    if (( $(echo "scale=2; ${residue_code#-} >= $tolerance" | bc) )); then
+      local status="FAIL"
+    else
+      local status="PASS"
+    fi
+
     #echo -e "--------------------------------"
     #for s in ${cal_status[*]}; do
     #  echo "<$s>"
     #done
     #echo -e "--------------------------------\n"
-    echo "$residue_code,$residue_error,$tolerance,$ideal,$actual,$injected_error,$latch_code,$latch_step,$path,$cal_bypass"
+    echo "$status,$residue_code,$residue_error,$tolerance,$ideal,$actual,$injected_error,$latch_code,$latch_step,$path,$cal_bypass"
 
   } >>$csv
 
@@ -4500,24 +4486,17 @@ function _comp_offset_injected_errors
   fi
 
   local log=$(readlink -e $1)
-
-  if [[ $2 ]]; then
-    export csv=$PWD/$(dirname $2 | xargs basename)__comp_offset_injected_errors.csv
-  else
-    local crf_rundir=$(sed -rn 's#.+/([^/]+)/simulation/.+#\1#p' <<<$log)
-    export csv=$PWD/${crf_rundir}__$(dirname $log | xargs basename)__comp_offset_injected_errors.csv
-  fi
+  export csv=$PWD/comp_offset_injected_errors.csv
 
   echo "INFO [COMPARATOR_OFFSET_INJECTED_ERRORS] Processing file $1 .." 1>&2
 
-  echo "sep=," >$csv
-  echo "SLICE,SUBADC,STAGE,INT ERROR NAME,INT ERROR VALUE,SCALING FACTOR,FLOAT ERROR NAME,FLOAT ERROR VALUE,PATH" >>$csv
+  echo "SLICE,SUBADC,STAGE,INT ERROR NAME,INT ERROR VALUE,SCALING FACTOR,FLOAT ERROR NAME,FLOAT ERROR VALUE,PATH" >$csv
 
   grep ' \[comparator_offset\]' $log | while read line; do
     local  slice=$(sed -rn 's/.* slice: ([^,]+),.*/\1/p' <<<$line)
     local   path=$(sed -rn 's/.* path: (\S+)/\1/p'        <<<$line)
-    local subadc=$(cut -d. -f11 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
-    local  stage=$(cut -d. -f13 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local subadc=$(cut -d. -f16 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local  stage=$(cut -d. -f18 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
 
     local int_error_name_val=($(sed -rn 's/.* (\w+_int\[[[:digit:]]+\]): ([^,]+),.*/\1 \2/p' <<<$line))
     local int_error_name=${int_error_name_val[0]}
@@ -4547,23 +4526,17 @@ function _latch_offset_injected_errors
 
   local log=$(readlink -e $1)
 
-  if [[ $2 ]]; then
-    export csv=$PWD/$(dirname $2 | xargs basename)__latch_offset_injected_errors.csv
-  else
-    local crf_rundir=$(sed -rn 's#.+/([^/]+)/simulation/.+#\1#p' <<<$log)
-    export csv=$PWD/${crf_rundir}__$(dirname $log | xargs basename)__latch_offset_injected_errors.csv
-  fi
+  export csv=$PWD/latch_offset_injected_errors.csv
 
   echo "INFO [LATCH_OFFSET_INJECTED_ERRORS] Processing file $1 .." 1>&2
 
-  echo "sep=," >$csv
-  echo "SLICE,SUBADC,STAGE,INT ERROR NAME,INT ERROR VALUE,SCALING FACTOR,FLOAT ERROR NAME,FLOAT ERROR VALUE,PATH" >>$csv
+  echo "SLICE,SUBADC,STAGE,INT ERROR NAME,INT ERROR VALUE,SCALING FACTOR,FLOAT ERROR NAME,FLOAT ERROR VALUE,PATH" >$csv
 
   grep ' \[latch_offset\]' $log | while read line; do
     local  slice=$(sed -rn 's/.* slice: ([^,]+),.*/\1/p' <<<$line)
     local   path=$(sed -rn 's/.* path: (\S+)/\1/p'        <<<$line)
-    local subadc=$(cut -d. -f11 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
-    local  stage=$(cut -d. -f13 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local subadc=$(cut -d. -f16 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local  stage=$(cut -d. -f18 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
 
     local int_error_name_val=($(sed -rn 's/.* (\w+_int\[[[:digit:]]+\]): ([^,]+),.*/\1 \2/p' <<<$line))
     local int_error_name=${int_error_name_val[0]}
@@ -4593,23 +4566,17 @@ function _ra_offset_injected_errors
 
   local log=$(readlink -e $1)
 
-  if [[ $2 ]]; then
-    export csv=$PWD/$(dirname $2 | xargs basename)__ra_offset_injected_errors.csv
-  else
-    local crf_rundir=$(sed -rn 's#.+/([^/]+)/simulation/.+#\1#p' <<<$log)
-    export csv=$PWD/${crf_rundir}__$(dirname $log | xargs basename)__ra_offset_injected_errors.csv
-  fi
+  export csv=$PWD/ra_offset_injected_errors.csv
 
   echo "INFO [RA_OFFSET_INJECTED_ERRORS] Processing file $1 .." 1>&2
 
-  echo "sep=," >$csv
-  echo "SLICE,SUBADC,STAGE,OFFSET_ERR_INT,OFFSET_SCALE,OFFSET_ERR,PATH" >>$csv
+  echo "SLICE,SUBADC,RA,OFFSET_ERR_INT,OFFSET_SCALE,OFFSET_ERR,PATH" >$csv
 
   grep ' \[ra_offset\]' $log | while read line; do
     local  slice=$(sed -rn 's/.* slice: ([^,]+),.*/\1/p' <<<$line)
     local   path=$(sed -rn 's/.* path: (\S+)/\1/p'        <<<$line)
-    local subadc=$(cut -d. -f11 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
-    local  stage=$(cut -d. -f13 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local subadc=$(cut -d. -f16 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local     ra=$(cut -d. -f18 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
 
     local int_error_val=$(sed -rn 's/.* offset_err_int: ([^,]+),.*/\1/p' <<<$line)
 
@@ -4617,7 +4584,7 @@ function _ra_offset_injected_errors
 
     local float_error_val=$(sed -rn 's/.* offset_err: ([^,]+),.*/\1/p' <<<$line)
 
-    echo -e "$slice\t$subadc\t$stage\t$int_error_val\t$scaling_factor\t$float_error_val\t$path"
+    echo -e "$slice\t$subadc\t$ra\t$int_error_val\t$scaling_factor\t$float_error_val\t$path"
 
   done | sort -k1,1n -k2,2n -k3,3n | sed 's/\t/,/g' >> $csv
 
@@ -4634,24 +4601,17 @@ function _ra_gain_injected_errors
   fi
 
   local log=$(readlink -e $1)
-
-  if [[ $2 ]]; then
-    export csv=$PWD/$(dirname $2 | xargs basename)__ra_gain_injected_errors.csv
-  else
-    local crf_rundir=$(sed -rn 's#.+/([^/]+)/simulation/.+#\1#p' <<<$log)
-    export csv=$PWD/${crf_rundir}__$(dirname $log | xargs basename)__ra_gain_injected_errors.csv
-  fi
+  export csv=$PWD/ra_gain_injected_errors.csv
 
   echo "INFO [RA_GAIN_INJECTED_ERRORS] Processing file $1 .." 1>&2
 
-  echo "sep=," >$csv
-  echo "SLICE,SUBADC,STAGE,GAIN_ERR_INT (%),GAIN_SCALE,GAIN_ERR,PATH" >>$csv
+  echo "SLICE,SUBADC,RA,GAIN_ERR_INT (%),GAIN_SCALE,GAIN_ERR,PATH" >$csv
 
   grep ' \[ra_gain\]' $log | while read line; do
     local  slice=$(sed -rn 's/.* slice: ([^,]+),.*/\1/p' <<<$line)
     local   path=$(sed -rn 's/.* path: (\S+)/\1/p'        <<<$line)
-    local subadc=$(cut -d. -f11 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
-    local  stage=$(cut -d. -f13 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local subadc=$(cut -d. -f16 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local     ra=$(cut -d. -f18 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
 
     local int_error_val=$(sed -rn 's/.* gain_err_int: ([^,]+),.*/\1/p' <<<$line)
 
@@ -4659,7 +4619,7 @@ function _ra_gain_injected_errors
 
     local float_error_val=$(sed -rn 's/.* gain_err: ([^,]+),.*/\1/p' <<<$line)
 
-    echo -e "$slice\t$subadc\t$stage\t$int_error_val\t$scaling_factor\t$float_error_val\t$path"
+    echo -e "$slice\t$subadc\t$ra\t$int_error_val\t$scaling_factor\t$float_error_val\t$path"
 
   done | sort -k1,1n -k2,2n -k3,3n | sed 's/\t/,/g' >> $csv
 
@@ -4676,21 +4636,14 @@ function _capacitor_code
   fi
 
   local log=$(readlink -e $1)
-
-  if [[ $2 ]]; then
-    export csv=$PWD/$(dirname $2 | xargs basename)__capacitor_code.csv
-  else
-    local crf_rundir=$(sed -rn 's#.+/([^/]+)/simulation/.+#\1#p' <<<$log)
-    export csv=$PWD/${crf_rundir}__$(dirname $log | xargs basename)__capacitor_code.csv
-  fi
+  export csv=$PWD/capacitor_code.csv
 
   echo "INFO [CAPACITOR_CODE] Processing file $1 .." 1>&2
 
-  echo "sep=," >$csv
-  echo "PAIR,SLICE,SUBADC_TOP,SUBADC_DEC,ID,CAP_CAL_LUT_ST1,CAP_CAL_LUT_ST2,CAP_CAL_LUT_ST3,IM3_DITHER_LUT_COEFF,PATH" >>$csv
+  echo "PAIR,SLICE,SUBADC_TOP,SUBADC_DEC,ID,CAP_CAL_LUT_ST1,CAP_CAL_LUT_ST2,CAP_CAL_LUT_ST3,IM3_DITHER_LUT_COEFF,PATH" >$csv
 
   grep ' \[capacitor_code\]' $log | while read line; do
-    local       pair=$(sed -rn 's/.* pair: ([^,]+),.*/\1/p'      <<<$line)
+    local       pair=$(sed -rn 's/.* pair: ([^,]+),.*/\1/p'       <<<$line)
     local      slice=$(sed -rn 's/.* slice: ([^,]+),.*/\1/p'      <<<$line)
     local subadc_top=$(sed -rn 's/.* subadc_top: ([^,]+),.*/\1/p' <<<$line)
     local subadc_dec=$(sed -rn 's/.* subadc_dec: ([^,]+),.*/\1/p' <<<$line)
@@ -4720,24 +4673,17 @@ function _capacitor_mismatch_injected_errors
   fi
 
   local log=$(readlink -e $1)
-
-  if [[ $2 ]]; then
-    export csv=$PWD/$(dirname $2 | xargs basename)__capacitor_mismatch_injected_errors.csv
-  else
-    local crf_rundir=$(sed -rn 's#.+/([^/]+)/simulation/.+#\1#p' <<<$log)
-    export csv=$PWD/${crf_rundir}__$(dirname $log | xargs basename)__capacitor_mismatch_injected_errors.csv
-  fi
+  export csv=$PWD/capacitor_mismatch_injected_errors.csv
 
   echo "INFO [CAPACITOR_MISMATCH_INJECTED_ERRORS] Processing file $1 .." 1>&2
 
-  echo "sep=," >$csv
-  echo "SLICE,SUBADC,STAGE,INT ERROR NAME,INT ERROR VALUE,SCALING FACTOR,FLOAT ERROR NAME,FLOAT ERROR VALUE,PATH" >>$csv
+  echo "SLICE,SUBADC,STAGE,INT ERROR NAME,INT ERROR VALUE,SCALING FACTOR,FLOAT ERROR NAME,FLOAT ERROR VALUE,PATH" >$csv
 
   grep ' \[capacitor_mismatch\]' $log | while read line; do
     local  slice=$(sed -rn 's/.* slice: ([^,]+),.*/\1/p' <<<$line)
     local   path=$(sed -rn 's/.* path: (\S+)/\1/p'        <<<$line)
-    local subadc=$(cut -d. -f11 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
-    local  stage=$(cut -d. -f13 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local subadc=$(cut -d. -f16 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local  stage=$(cut -d. -f18 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
 
     local int_error_name_val=($(sed -rn 's/.* (\w+(\[[[:digit:]]+\])?): ([^,]+), cap_mismatch_scale:.*/\1 \3/p' <<<$line))
     local int_error_name=${int_error_name_val[0]}
@@ -4766,24 +4712,17 @@ function _im3_dither_capacitor_mismatch_injected_errors
   fi
 
   local log=$(readlink -e $1)
-
-  if [[ $2 ]]; then
-    export csv=$PWD/$(dirname $2 | xargs basename)__im3_dither_capacitor_mismatch_injected_errors.csv
-  else
-    local crf_rundir=$(sed -rn 's#.+/([^/]+)/simulation/.+#\1#p' <<<$log)
-    export csv=$PWD/${crf_rundir}__$(dirname $log | xargs basename)__im3_dither_capacitor_mismatch_injected_errors.csv
-  fi
+  export csv=$PWD/im3_dither_capacitor_mismatch_injected_errors.csv
 
   echo "INFO [IM3_DITHER_CAPACITOR_MISMATCH_INJECTED_ERRORS] Processing file $1 .." 1>&2
 
-  echo "sep=," >$csv
-  echo "SLICE,SUBADC,STAGE,INT ERROR NAME,INT ERROR VALUE,SCALING FACTOR,FLOAT ERROR NAME,FLOAT ERROR VALUE,PATH" >>$csv
+  echo "SLICE,SUBADC,STAGE,INT ERROR NAME,INT ERROR VALUE,SCALING FACTOR,FLOAT ERROR NAME,FLOAT ERROR VALUE,PATH" >$csv
 
   grep ' \[im3_dither_capacitor_mismatch\]' $log | while read line; do
     local  slice=$(sed -rn 's/.* slice: ([^,]+),.*/\1/p' <<<$line)
     local   path=$(sed -rn 's/.* path: (\S+)/\1/p'        <<<$line)
-    local subadc=$(cut -d. -f11 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
-    local  stage=$(cut -d. -f13 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local subadc=$(cut -d. -f16 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
+    local  stage=$(cut -d. -f18 <<<$path | sed -rn 's/.+([[:digit:]])$/\1/p')
 
     local int_error_name_val=($(sed -rn 's/.* (\w+(\[[[:digit:]]+\])?): ([^,]+), cap_mismatch_scale:.*/\1 \3/p' <<<$line))
     local int_error_name=${int_error_name_val[0]}
@@ -4834,8 +4773,7 @@ function _fg_cal_passfail
 
   export csv=$rundir/${crfrundir}__fg_cal_passfail.csv
 
-  echo "sep=," >$csv
-  echo "ID,TEST,SEED,SLICE,FFT,CAL" >>$csv
+  echo "ID,TEST,SEED,SLICE,CAL SCBD,DATA SCBD,RESIDUAL ERROR" >$csv
 
   simenv file -d $rundir run.log | while read log; do
     echo "INFO [FG_CAL_PASSFAIL] Processing file $log .." 1>&2
@@ -4850,29 +4788,31 @@ function _fg_cal_passfail
 
     sed -rn '
       s/.+: (\w+):([[:digit:]]+)\s+DETECTED.*/echo \1 >> \2/e
-      s/^UVM_ERROR @ .+adc_scbd_h\[([[:digit:]])\] .+/touch \1ERROR/e
-      s/^UVM_ERROR @ [[:digit:]]+ ps: reporter \[RNM HELPER\] .+IRX01.I_ADC_Q.+/touch 0CALERROR/e
-      s/^UVM_ERROR @ [[:digit:]]+ ps: reporter \[RNM HELPER\] .+IRX01.I_ADC_I.+/touch 1CALERROR/e
-      s/^UVM_ERROR @ [[:digit:]]+ ps: reporter \[RNM HELPER\] .+IRX23.I_ADC_Q.+/touch 2CALERROR/e
-      s/^UVM_ERROR @ [[:digit:]]+ ps: reporter \[RNM HELPER\] .+IRX23.I_ADC_I.+/touch 3CALERROR/e
+      s/^UVM_ERROR @ .+adc_cal_scbd_h\[([[:digit:]])\] .+/touch \1CALSCBDERROR/e
+      s/^UVM_ERROR @ .+adc_scbd_h\[([[:digit:]])\] .+/touch \1DATASCBDERROR/e
+      s/^UVM_ERROR @ [[:digit:]]+ ps: reporter \[RNM HELPER\] .+I_IQ_PAIR_RIGHT\.I_RX_TOP.+/touch 0CALERROR/e
+      s/^UVM_ERROR @ [[:digit:]]+ ps: reporter \[RNM HELPER\] .+I_IQ_PAIR_RIGHT\.I_RX_BOT.+/touch 1CALERROR/e
+      s/^UVM_ERROR @ [[:digit:]]+ ps: reporter \[RNM HELPER\] .+I_IQ_PAIR_LEFT\.I_RX_BOT.+/touch 2CALERROR/e
+      s/^UVM_ERROR @ [[:digit:]]+ ps: reporter \[RNM HELPER\] .+I_IQ_PAIR_LEFT\.I_RX_TOP.+/touch 3CALERROR/e
     ' $log
 
     for slice in $(ls -d ?); do
-      local status=$(   if [[ -f ${slice}ERROR    ]]; then echo FAIL; else echo PASS; fi)
-      local calstatus=$(if [[ -f ${slice}CALERROR ]]; then echo FAIL; else echo PASS; fi)
+      local calscbd=$(  if [[ -f ${slice}CALSCBDERROR ]]; then echo FAIL; else echo PASS; fi)
+      local datascbd=$( if [[ -f ${slice}DATASCBDERROR ]]; then echo FAIL; else echo PASS; fi)
+      local residualerror=$(if [[ -f ${slice}CALERROR ]]; then echo FAIL; else echo PASS; fi)
 
       steps=$(cat <(cat $slice | nl -nln -s" " -w1 | sed -r 's/(\S+) (\S+)/\2 \1/') <(seq -f "- %.0f" 14) | sort -k2,2n -k1,1r | uniq -f1 | cut -d' ' -f1 | xargs | sed 's/ /,/g')
 
-      echo ",$tc,$seed,$slice,$status,$calstatus,$steps"
+      echo "$tc,$seed,$slice,$calscbd,$datascbd,$residualerror,$steps"
     done
 
     popd 2>&1 >/dev/null
 
-  done >> $csv
-  #done | nl -nln -s, -w1 >> $csv
+  done | nl -nln -s, -w1 >> $csv
 
+  simenv csv_2xls $csv
 
-  echo "INFO [FG_CAL_PASSFAIL] Created $csv" 1>&2
+  echo "INFO [FG_CAL_PASSFAIL] Created ${csv/.csv/.xlsx}" 1>&2
 }
 
 
@@ -4889,9 +4829,6 @@ function _fg_cal_run_csv
     exit ${1:-0}
   }
 
-  if (($# < 1)); then
-    usage 1
-  fi
 
   local run_csv_dir=${1:-$PWD}
 
@@ -4902,15 +4839,18 @@ function _fg_cal_run_csv
     exit 1
   fi
 
-  echo -n "Generating the reg_field map.. "
-  simenv reg_field_list > reg_field
+  if [[ ! -e reg_field || $(find reg_field -mmin +$((60*24))) ]]; then
+    echo -n "Generating the reg_field map.. "
+    simenv reg_field_list > reg_field
+    echo
+  fi
 
   simenv file -d $rundir run.log | while read log; do
     echo "INFO [RUN_CSV] Processing $log .."
 
     simenv  fft_log                                       $log
 
-    simenv  cal_status_ra                                 $log
+    simenv  cal_status_ra_offset_gain                     $log
     simenv  cal_status_comp_offset                        $log
     simenv  cal_status_latch_offset                       $log
 
@@ -4923,8 +4863,19 @@ function _fg_cal_run_csv
     simenv  capacitor_mismatch_injected_errors            $log
     simenv  im3_dither_capacitor_mismatch_injected_errors $log
 
-    simenv  log_regaccess_to_csv -regf reg_field	  $log
+    simenv  log_regaccess_to_csv -regf reg_field	        $log
 
+    local titer=$(simenv testiter $log)
+    local tname=$(simenv testname $log)
+    local raccn=$tname${titer:+_$titer}
+
+    simenv csv_2xls -m -o injerr_info__$raccn.xlsx  ra_offset_gain.csv comp_offset.csv latch_offset.csv capacitor_code.csv  \
+                                                    comp_offset_injected_errors.csv latch_offset_injected_errors.csv ra_offset_injected_errors.csv  \
+                                                    ra_gain_injected_errors.csv capacitor_mismatch_injected_errors.csv im3_dither_capacitor_mismatch_injected_errors.csv  \
+                                                    regacc_$raccn.csv
+
+
+    rm  -f *injected*.csv  *offset*.csv  capacitor*.csv  regacc_*.csv
     echo
   done
 
@@ -5163,7 +5114,7 @@ function _reg_field_list
 {
   local ral=$(ral_dir)
 
-  echo Creating the reg field map... 1>&2
+  echo "Creating the reg field map..." 1>&2 > /dev/null
 
   (
   # **********************************************
@@ -5178,10 +5129,15 @@ function _reg_field_list
   simenv reg_field  dac $ral/dac/ral_rfdac_config.sv
 
   # **********************************************
-  #                     RFCOM
+  #                     COM
   # **********************************************
   simenv reg_field  com $ral/com/ral_rfcom_main_apb_if.sv
   simenv reg_field  com $ral/com/ral_rfcom_pll_clk_apb_if.sv
+
+  # **********************************************
+  #                     NPI
+  # **********************************************
+  simenv reg_field  npi $ral/npi/ral_rfcom.sv
 
   # **********************************************
   #                      TC
@@ -5283,20 +5239,27 @@ function _log_regaccess_to_csv
 
   function proc
   {
-    local timestamp=$1 scope=$2 reg=$3 val=$4
-    local old_scope=$scope
+    local timestamp=$1 acc=$2 scope=$3 reg=$4 val=$5
+    local old_scope=$scope slice=
+
+    if [[ $acc =~ Write ]]; then
+      acc=WR
+    else
+      acc=RD
+    fi
 
     if [[ $scope =~ (sub)?adc_reg_h([[:digit:]]) ]]; then
-      #if [[ ${BASH_REMATCH[1]} ]]; then
-      # local scope=subadc
-      #else
-        local scope=adc
-      #fi
-
-      local slice=${BASH_REMATCH[2]}
+      scope=adc
+      slice=${BASH_REMATCH[2]}
+    elif [[ $scope =~ dac_reg_h([[:digit:]]) ]]; then
+      scope=dac
+      slice=${BASH_REMATCH[1]}
+    elif [[ $scope =~ rfcom_bank ]]; then
+      scope=npi
+      slice=-
     else
-      local scope=com
-      local slice=-
+      scope=com
+      slice=-
     fi
 
     function fields
@@ -5315,32 +5278,32 @@ function _log_regaccess_to_csv
     }
 
     #echo -e "$timestamp\t$old_scope\t$scope\t$slice\t$reg\t$val"
-    echo -e "$timestamp,$scope,$slice,$reg,$(printf "0x%0X" $val),$(fields $scope $reg $val)"
+    echo -e "$timestamp,$acc,$scope,$slice,$reg,$(printf "0x%0X" $val),$(fields $scope $reg $val)"
   }
 
   export -f proc
 
   for log in ${args[@]}; do
-    if ((quiet)); then
-      echo Processing $log 1>&2
+    if ((!quiet)); then
+      echo INFO [LOG_REGACCESS_TO_CSV] Processing $log 1>&2
     fi
 
     local testname=$(simenv testname $log)
     local iter=$(simenv testiter $log)
-    local csv=${testname}${iter:+_$iter}.csv
+    local csv=regacc_${testname}${iter:+_$iter}.csv
 
 
-    grepout=$(grep ' \[RAL_WRITE' $log | sed -rn 's/^UVM_INFO @ ([[:digit:]]+) .+ adc_ral_h0\.(\w+)\.([A-Z0-9_]+): Write Data .+ = (0x[[:xdigit:]]+); .+/proc \1 \2 \3 \4/ep')
+    grepout=$(grep ' \[RAL_\(WRITE\|READ\)\]' $log | sed -rn 's/^UVM_INFO @ ([[:digit:]]+) .+ \w+_ral_h0\.(\w+)\.([A-Z0-9_]+): (Write Data \(Desired Data\)|Read Data) = (0x[[:xdigit:]]+).*/proc \1 "\4" \2 \3 \5/ep')
 
     if [[ -z $grepout ]]; then
       echo -e "\e[1;31m-W-\e[0m No register access found in $log" 1>&2
     else
       > $csv
-      echo "$grep" >> $csv
+      echo "$grepout" >> $csv
 
       fields_header=$(seq -f "FIELD %.0f" 1 $(($(tail -n +3 $csv | sed -r 's/.*/echo "&" | grep -Po , | wc -l/ep' | sort -run | head -1) -5 +1)) | paste -s | sed -r 's/\t/,/g')
 
-      sed -i "1 i TIMESTAMP,SCOPE,SLICE,REGISTER,VALUE,$fields_header" $csv
+      sed -i "1 i TIMESTAMP,ACCESS,SCOPE,SLICE,REGISTER,VALUE,$fields_header" $csv
 
       if ((xls)); then
         simenv csv_2xls $csv -quiet
@@ -5356,14 +5319,14 @@ function _regaccess_to_csv
 {
   function usage
   {
-    echo "Usage: regaccess_to_csv [options] [<run directory>]"
+    echo "Usage: regaccess_to_csv [options] [<run directory> | <log file>]"
     echo
     echo "Options:"
     echo "  -h, --help"
     echo "      --fail	      Only failed testcase are reported"
     echo
     echo "Arguments:"
-    echo "  <run directory>   Directory to process, defaults to current directory"
+    echo "  <run directory>   Directory to process, defaults to current directory if no log file is provided on stdin"
     echo
 
     exit ${1:-0}
@@ -5389,23 +5352,41 @@ function _regaccess_to_csv
           usage 1
           ;;
       
-      *) dir=$1
+      *) dir=$(readlink -e $1)
          shift
-
-         if [[ ! -d $dir ]]; then
-           if [[ -f $dir ]]; then
-             echo -e "\e[1;31m-E-\e[0m '$dir' is a file not a directory"
-             usage 1
-           fi
-
-           echo -e "\e[1;31m-E-\e[0m Directory '$dir' not found"
-           usage 2
-         fi
          ;;
     esac
   done
 
-  local dir=${dir:-$PWD}
+  if [[ -z $dir ]]; then
+    if [[ -p /dev/stdin ]]; then
+      logfiles=($(cat))
+      prefix="stdin"
+    else
+      logfiles=($(simenv log))
+      prefix="cwd"
+    fi
+  elif [[ -f $dir ]]; then
+    logfiles=($dir)
+    prefix=$(simenv testname $dir)
+  elif [[ -d $dir ]]; then
+    logfiles=($(simenv log $dir))
+    prefix=$(basename $dir)
+  fi
+
+  # Check if any log files were found
+  if (( ! ${#logfiles} )); then
+    echo -e "\e[1;31mNo log files found\e[0m"
+    usage 1
+  else
+    # Check if all log files exist
+    for log in ${logfiles[*]}; do
+      if [[ ! -f $log ]]; then
+        echo -e "\e[1;31m-E-\e[0m Log file '\e[1m$log\e[0m' not found\n"
+        usage 1
+      fi
+    done
+  fi
 
   echo
   echo -n "Generating the reg_field map.. "
@@ -5416,23 +5397,26 @@ function _regaccess_to_csv
 
   mkdir -p _csv
   cd _csv
-  rm -f *.csv
+  rm -f *.csv *.xlsx
 
   csvfiles=()
-  for log in $(simenv file -d $dir run.log); do
+  for log in ${logfiles[*]}; do
     testname=$(simenv testname $log)
     iter=$(simenv testiter $log)
-    csv=${testname}${iter:+_$iter}.csv
+    short_nm=${testname}${iter:+_$iter}.csv
+    csv=regacc_$short_nm
 
     echo Processing $log
     simenv log_regaccess_to_csv -quiet -regf $SUB_DIR/reg_field $log
 
     if [[ -f $csv ]]; then
-      csvfiles+=($csv)
+      mv $csv $short_nm
+      csvfiles+=($short_nm)
     fi
   done
 
-  simenv csv_2xls -m -o ../$(basename $PWD)__regaccess_$(date +%Y%m%d_%H%M%S).xlsx ${csvfiles[@]}
+  simenv csv_2xls -m -o ${prefix}__regaccess_$(date +%Y%m%d_%H%M%S).xlsx ${csvfiles[@]}
+  mv *.xlsx ..
 }
  
 # Function: regr_status
@@ -5938,6 +5922,7 @@ function _regr_passfail
     echo "  -s, --separator	  Add a separator to the CSV file"
     echo "  -o, --output <csv>	  Output CSV file,  defaults passfail_<yyyy><mm><dd>_<hh><mm><ss>.csv"
     echo "  -x, --xls    <xls>	  Output XLSX file, defaults passfail_<yyyy><mm><dd>_<hh><mm><ss>.xlsx"
+    echo "  -c, --error_count <cnt>	  Count errors, defaults to 1"
     echo "  -q, --quiet		  Suppress output"
     echo
     echo "Arguments:"
@@ -5946,7 +5931,7 @@ function _regr_passfail
     exit ${1:-0}
   }
 
-  opts=$(getopt -oh,o:,s,q -l help,output:,separator,quiet -- "$@")
+  opts=$(getopt -oh,o:,s,q,c: -l help,output:,separator,quiet,error_count: -- "$@")
   if (($?)); then
     usage 1
   fi
@@ -5974,6 +5959,11 @@ function _regr_passfail
 	      shift 2
 	      ;;
 
+      -c|--error_count)
+        error_count=$2
+        shift 2
+        ;;
+
       -q|--quiet)
 	      quiet=1
 	      shift
@@ -5986,7 +5976,7 @@ function _regr_passfail
 	        usage 1
 	        ;;
 
-      *) rundir=$1
+      *) rundir=$(readlink -e $1)
 	 shift
 	;;
     esac
@@ -5998,6 +5988,8 @@ function _regr_passfail
 
   default_csv=passfail_$(date +%Y%m%d_%H%M%S).csv
   output_csv=$(readlink  -f ${csv:-$default_csv})
+
+  pwd=$PWD
 
   if [[ -n $rundir ]]; then
     if [[ ! -d $rundir ]]; then
@@ -6017,23 +6009,29 @@ function _regr_passfail
     seed=$(simenv testseed $log)
     status=$(simenv teststatus $log)
     iter=$(basename $(dirname $log) | sed -rn 's/.*_iter([[:digit:]]+)/\1/p')
+    cputime=$(grep 'CPU time :' $log | grep -Po '\d+(?=\.)')
     
     if [[ $status == FAIL ]]; then
-      msg=$(simenv testerrors $log | head -1 | sed 's/ /____space____/g')
+      msg=$(simenv testerrors $log | head -${error_count:-1} | sed -r 's/ /____space____/g; s/"/____double_quote____/g')
     else
       msg="____empty____"
     fi
 
-    echo $testname $seed "\"$iter\"" $status "\"$msg\"" $log
-  done | sed -r 's/ /,/g; s/____space____/ /g; s/____empty____//g' > $output_csv	
+    echo $testname "\"$iter\"" "\"$seed\"" "\"$status\"" "\"$cputime\"" "\"$msg\"" $log
+  done | sed -r 's/ /,/g; s/____space____/ /g; s/____empty____//g; s/____double_quote____/'"'"'/g' > $output_csv	
 
-  sed -i '1i testname,seed,iter,status,1st error,log' $output_csv
+  sed -i '1i TESTNAME,ITER,SEED,STATUS,CPUTIME,1ST ERROR,LOG' $output_csv
 
   if ((separator)); then
     simenv csv_separator add $output_csv
   fi
 
-  simenv csv_2xls $output_csv
+  if [[ $PWD != $pwd ]]; then
+    cp $output_csv $pwd
+  fi
+
+  cd $pwd
+  simenv csv_2xls $(basename $output_csv)
 }
 
 # Function: testname
@@ -6091,7 +6089,66 @@ function _testname
   fi
 
 
-  grep -Pom1 'Running test \K\w+' $log
+  # grep -Pom1 'Running test \K\w+' $log
+  dirname $log | xargs basename | sed -r 's/_iter[0-9]+//'
+}
+
+# Function: testrundir
+#
+function _testrundir
+{
+  function usage
+  {
+    echo "Usage: testrundir [options] <log>"
+    echo
+    echo "Options:"
+    echo "  -h, --help    show this help message and exit"
+    echo
+    echo "Arguments:"
+    echo "   <log>	  log file"
+
+    exit ${1:-0}
+  }
+
+  opts=$(getopt -o h -l help -- "$@")
+  if (($?)); then
+    usage 1
+  fi
+
+  eval set -- $opts
+
+  while (($#)); do
+    case $1 in
+      -h|--help)
+	      usage
+	      ;;
+
+      --) shift
+	      ;;
+
+      -*) echo -e "\e[1;31m-E-\e[0m Unknown option: $1" 1>&2
+	      usage 1
+	      ;;
+
+      *)  log=$1
+	        shift
+	        ;;
+
+    esac
+  done
+
+  if [[ -n $log ]]; then
+    if [[ ! -f $log ]]; then
+      echo -e "\e[1;31m-E-\e[0m $log does not exist" 1>&2
+      usage 1
+    fi
+  else
+    echo -e "\e[1;31m-E-\e[0m No log file specified" 1>&2
+    usage 1
+  fi
+
+
+  dirname $log | xargs basename
 }
 
 # Function: testiter
@@ -6509,11 +6566,90 @@ function _testcard
 }
 
 
+# Function: testuser
+#
+#
+function _testuser
+{
+  function usage
+  {
+    echo "Usage: testuser [options] [<log>...]"
+    echo
+    echo "Options:"
+    echo "  -h, --help		  Show this help message and exit"
+    echo
+    echo "Arguments:"
+    echo "   <log>...		  Log files, may be provided from standard input"
+
+    exit ${1:-0}
+  }
+
+
+  opts=$(getopt -o h -l help -- "$@")
+  if (($?)); then
+    usage 1
+  fi
+
+  eval set -- $opts
+
+  while (($#)); do
+    case $1 in
+      -h|--help)
+        usage
+        ;;
+
+      --) shift
+          ;;
+
+      -*) echo -e "\e[1;31m-E-\e[0m Unknown option \e[1m$1\e[0m"
+          usage 1
+          ;;
+
+      *)  _logs[${#_logs[@]}]=$1 
+          shift
+          ;;
+    esac
+  done
+
+  if [[ -p /dev/stdin ]]; then
+    _logs+=($(cat))
+  fi
+
+  # Now need to make sure entries of _logs are non null are are existing files
+  # If so, store them in a new array logs
+  for _log in ${_logs[@]}; do
+    if [[  $_log ]]; then
+      if [[ -f $_log ]]; then
+        logs[${#logs[@]}]=$_log
+      else
+        echo -e "\e[1;31m-E-\e[0m File \e[1m$_log\e[0m does not exist"
+      fi
+    fi
+  done
+
+
+  if (( ! ${#logs[@]} )); then
+    echo -e "\e[1;31m-E-\e[0m No log files specified"
+    usage 2
+  fi
+
+  for log in ${logs[@]}; do
+    user=$(grep -m1 -Po '\+user=\K\w+' $log)
+
+    if ((${#logs[@]} > 1)); then
+      echo -e "$user\t$log"
+    else
+      echo -e $user
+    fi
+  done
+}
+
+
 # Function: fail_pattern
 #
 function _fail_pattern
 {
-  grep fail_pattern $PROJ_INI | cut -d' ' -f3- | sed -r 's/,/|/g; s/\[|\]/\\&/g'
+  grep fail_pattern $PROJ_INI | cut -d' ' -f3- | sed -r 's/$/, failed at ,Offending /; s/,/|/g; s/\[|\]/\\&/g'
 }
 
 # Function: testerrors
@@ -6529,6 +6665,7 @@ function _testerrors
     echo "  -c, --count <count>	  Display only the first <count> errors"
     echo "  -H			  Show matching file name, like grep -H"
     echo "  -F			  Show matching file name"
+    echo "  -V			  Display file name before the matches"
     echo
     echo "Arguments:"
     echo "   <log>...		  Log files, may be provided from standard input"
@@ -6536,7 +6673,7 @@ function _testerrors
     exit ${1:-0}
   }
 
-  opts=$(getopt -o h,c:,H,F -l help,count: -- "$@")
+  opts=$(getopt -o h,c:,H,F,V -l help,count: -- "$@")
   if (($?)); then
     usage 1
   fi
@@ -6570,6 +6707,11 @@ function _testerrors
 	      shift
 	      ;;
 
+      -V)
+	      echo_file=1
+	      shift
+	      ;;
+
       --) shift
 	        ;;
 
@@ -6596,7 +6738,17 @@ function _testerrors
   fail_pattern=$(simenv fail_pattern)
   fail_pattern+="|TERM_(RUN|MEM)LIMIT: job killed after reaching LSF (run time|memory usage) limit"
 
+  k=0
   for log in "${logs[@]}"; do
+    if ((echo_file)); then
+      if [[ -f grep_content ]] && (( $(wc -c grep_content | cut -d' ' -f1) > 0)); then
+        if ((k)); then echo; fi
+        rm -f grep_content
+      fi
+
+      echo  $log
+    fi
+
     grep -E ${show_file:+-H} "$fail_pattern" $log | if ((count)); then
       head -n $count  
     else
@@ -6605,8 +6757,16 @@ function _testerrors
       else
 	      cat
       fi
-    fi
+      fi | if ((echo_file)); then
+        tee grep_content
+      else
+        cat
+      fi
+
+    ((k++))
   done
+
+  rm -f grep_content
 }
 
 
@@ -7245,7 +7405,7 @@ function _csv_2xls
     echo "                  output file name, defaults to merge_yyyymmdd_hhmmss.xlsx"
     echo
     echo "Arguments:"
-    echo "  <csv>...	    CSV files to process. In addition they may be provided from stdin"
+    echo "  <csv>...	    CSV files to process. Defaults to stdin"
 
     exit ${1:-0}
   }
@@ -7306,8 +7466,13 @@ function _csv_2xls
     esac
   done
 
-  if [[ -p /dev/stdin ]]; then
-    csv+=($(cat))
+  if ((csvid == 0)); then
+    if [[ -p /dev/stdin ]]; then
+      csv=($(cat))
+    else
+      echo -e "\e[1;31m-E-\e[0m No CSV file provided"
+      usage 3
+    fi
   fi
 
   # Making sure all csv files actually exist
@@ -7335,10 +7500,11 @@ function _csv_2xls
   if ((${#csv[@]} > 1 && merge)); then
     defauflt_output=merge_$(date +"%Y%m%d_%H%M%S").fods
     if [[ -n $output ]]; then
-      defauflt_output=$(echo $output | cut -d. -f1).fods
+      defauflt_output=$(echo $output | sed -r 's/(.*)\..*/\1/').fods
     fi
 
     unoconv -f fods ${csv[@]}
+    
     sed -n '/<office:spreadsheet>/ {:end; n; /<\/office:spreadsheet>/b; b end}; p' ${csv[0]/.csv/.fods} > $defauflt_output
     sed -n '/<office:spreadsheet>/ {h; :end; n; H; /<\/office:spreadsheet>/ {g; p; z; b}; b end}' ${csv[@]//.csv/.fods} > sheets.xml
     sed -i '/<office:body>/r sheets.xml' $defauflt_output
@@ -7422,7 +7588,11 @@ function _rerun
     echo "Usage: rerun [options] [<log>]"
     echo
     echo "Options:"
-    echo "  -h, --help     show this help message and exit"
+    echo "  -h, --help     Show this help message and exit"
+    echo "  -n, --dry-run  Do not actually run anything"
+    echo "  -d, --debug    Run in debug mode"
+    echo "      --nosva    Do not run SVA"
+    echo "      --fft      Enable FFT plot generation"
     echo
     echo "Arguments:"
     echo "  <log>          Log file to process, or /dev/stdin if not specified"
@@ -7437,7 +7607,7 @@ function _rerun
     fi
   fi
 
-  opt=$(getopt -a -oh -lhelp -- "$@")
+  opt=$(getopt -a -oh,n,d -lhelp,dry-run,debug,nosva,fft -- "$@")
   if (($?)); then
     usage 1
   fi
@@ -7449,6 +7619,26 @@ function _rerun
       -h|--help)
 	      usage
 	      ;;
+
+      -n|--dry-run)
+        dry=1
+        shift
+	      ;;
+
+      -d|--debug)
+        debug=1
+        shift
+        ;;
+
+      --nosva)
+        nosva=1
+        shift
+        ;;
+
+      --fft)
+        fft=1
+        shift
+        ;;
 
       --) shift
 	        ;;
@@ -7487,12 +7677,25 @@ function _rerun
   fi
 
 
-  testname=$(simenv testname $log)
+  testname=$(dirname $log | xargs basename | sed -r 's/_iter[[:digit:]]+//')
   seed=$(simenv testseed $log)
   crflog=$(simenv testcrfdir -a $log)/crf.log
   overwrite=$(grep crf $crflog | head -1 | grep -Po "'.+-overwrite \K.+(?=')")
 
-  crf -wf $CRF_WF -tc $PROJ_INI -testcase $testname -seed $seed -count 1 -overwrite "$overwrite	DUMP_FSDB=yes UVM_VERBOSITY=MEDIUM"
+  if ((debug)); then
+    user_plusargs=+DEBUG
+  fi
+
+  if ((nosva)); then
+    user_plusargs+=" +define+NO_ASSERT"
+  fi
+
+  if ((fft)); then
+    user_plusargs+=" +with_fft +fft_save_plot"
+  fi
+
+
+  $(if ((dry)); then echo echo; else echo eval; fi) "crf -wf $CRF_WF -tc $PROJ_INI -testcase $testname -seed $seed -count 1 -overwrite '$overwrite DUMP_FSDB=yes UVM_VERBOSITY=UVM_MEDIUM ${user_plusargs:+USER_PLUSARGS+=\"$user_plusargs\"}'"
 }
 
 # Function: jira
@@ -7522,8 +7725,8 @@ function _jira
 
   nobackup=/everest/wwg_nobkup/workspaces/clifden_verif
 
-  if [[ ! $jira =~ ^(CFV|ERD) ]]; then
-    echo -e "\e[1;31m-E-\e[0m JIRA should start with either CFV or ERD"
+  if [[ ! $jira =~ ^(CFV|ERD|EDT) ]]; then
+    echo -e "\e[1;31m-E-\e[0m JIRA should start with either CFV, ERD or EDT"
     usage 1
   fi
 
@@ -7540,7 +7743,7 @@ function _jira
   log=$rundir/run.log
   testname=$(simenv testname $log)
   seed=$(simenv testseed $log)
-  fsdb=$rundir/$testname.fsdb
+  fsdb=$(simenv fsdb $rundir)
   crflog=$(simenv testcrfdir -a $log)/crf.log
   overwrite=$(grep crf $crflog | head -1 | grep -Po "'.+-overwrite \K.+(?=')" | sed -r 's/ (\S+=)/\n\1/g' | simenv uniquify | paste -s -d' ')
 
@@ -7744,13 +7947,15 @@ function _replay
 {
   function usage
   {
-    echo "Usage: replay [options] <run directory>"
+    echo "Usage: replay [options] [<run directory>]"
     echo
     echo "Options:"
     echo "  -h, --help	      Print this help message and exit"
     echo "  -v, --verbose     Print verbose output"
     echo
-    echo "  <run directory>   The run directory to replay"
+    echo "Arguments:"
+    echo "  <run directory>   The run directory to repla, if provided"
+    echo "                    else expects log files from stdin"
 
     exit ${1:-0}
   }
@@ -7787,16 +7992,49 @@ function _replay
   done
 
 
-  if [[ -z $run_dir ]]; then
-    echo -e "-E- No run directory provided"
-    usage 1
+  if [[ -p /dev/stdin ]]; then
+    logs=$(cat) 
+  elif [[ $run_dir ]]; then
+    if [[ ! -d $run_dir ]]; then
+      echo -e "-E- Argument is not a directory"
+      usage 2
+    fi
 
-  elif [[ ! -d $run_dir ]]; then
-    echo -e "-E- Argument is not a directory"
-    usage 2
+    run_dir=$(readlink -e $run_dir)
+    logs=$(simenv log $run_dir | simenv testerrors -F) 
   fi
 
-  run_dir=$(readlink -e $run_dir) pwd=$PWD
+  if [[ ! $logs ]]; then
+    echo -e "\e[1m-E-\e[0m No logs found"
+    usage 3
+  fi
+
+  pwd=$PWD
+
+  cd $SUB_DIR
+
+
+  for log in $logs; do
+    testname=$(simenv testname $log)
+    seed=$(simenv testseed $log)
+
+    get_test_section $testname  $seed
+
+    echo ${testname}_$seed >> testlist
+  done > sections
+  
+  cat <<REPLAY > tests
+[ REPLAY ]
+Subfamily = RFAMS_ADC
+
+tests =  \\
+$(sed '$! s/$/ \\/' testlist)
+
+
+REPLAY
+
+
+  cat tests sections > $pwd/replay.ini
 
   sed -rn '
     :ini
@@ -7814,38 +8052,7 @@ function _replay
 
     p
 
-  ' $PROJ_INI > top.ini
-
-
-  cd $SUB_DIR
-
-  sim_fail=$(simenv file -d $run_dir SIM_FAIL) 
-
-  if [[ $sim_fail ]]; then
-    echo "$sim_fail" | xargs dirname | while read cdir; do
-    testname=$(echo $cdir | xargs basename | sed -r 's/_(iter)?[[:digit:]]+$//')
-      seed=$(grep -Po 'seed used:\s+\K\d+|\+ntb_random_seed=\K\d+' $cdir/run.log)
-
-      get_test_section $testname  $seed
-
-      echo ${testname}_$seed >> testlist
-    done > sections
-    
-    cat <<REPLAY > tests
-[ REPLAY ]
-Subfamily = RFAMS_ADC
-
-tests =  \\
-$(sed '$! s/$/ \\/' testlist)
-
-
-REPLAY
-
-  cat tests sections > $pwd/replay.ini
-
-  else
-    echo -e "\e[1m-W-\e[0m No SIM_FAIL found"
-  fi
+  ' $PROJ_INI > $pwd/top.ini
 }
 
 function get_test_section
@@ -7893,13 +8100,13 @@ function _get_test_section
   ' "${inilist[@]}"
 }
 
-# Function : png
+# Function: png
 #
 function _png
 {
   function usage
   {
-    echo -e "Usage: png [--help|-h] [directory>]"
+    echo -e "Usage: png [--help|-h] [<directory>]"
     echo
     echo "Options:"
     echo "  -h, --help	      Print this help message and exit"
@@ -7963,7 +8170,7 @@ function _runlog
     echo "      --fail	      Limit to failed tests"
     echo
     echo "Arguments:"
-    echo "  <run directory>   The run directory to locate log files, default is current directory"
+    echo "  <run directory>   The run directores to locate log files, default is current directory"
 
     exit ${1:-0}
   }
@@ -8339,6 +8546,9 @@ function _coverage
     echo -e "\e[1mOptions\e[0m"
     echo "  -h, --help        Print this help message and exit"
     echo
+    echo "  -v, --verbosity <low|medium|high|debug>"
+    echo "                    Print this help message and exit"
+    echo
     echo "  -T, --topology <topology>"
     echo "                    Specify a topology to run"
     echo
@@ -8355,6 +8565,13 @@ function _coverage
     echo "  -c, --count <count>"
     echo "                    Specify a count to run"
     echo
+    echo "  -s, --seed <seed>"
+    echo "                    Specify a seed to run"
+    echo
+    echo "  -w, --waves       Enables waves generation"
+    echo
+    echo "  -d, --debug       Enables debug mode"
+    echo
     echo "  -n, --dry-run     Dry run. Display the command that would be run and exit"
     echo
     echo -e "\e[1mArguments\e[0m"
@@ -8368,7 +8585,7 @@ function _coverage
     usage 1
   fi
 
-  opt=$(getopt -a -oh,b:,c:,n,T: -lhelp,block:,tag:,testcase:,count:,dry-run,topology: -- "$@")
+  opt=$(getopt -a -oh,v:,b:,c:,n,T:u,s:,w,d -lhelp,verbosity:,block:,tag:,testcase:,count:,seed:,dry-run,topology:,waves,debug -- "$@")
   if (($?)); then
     usage 1
   fi
@@ -8379,6 +8596,11 @@ function _coverage
     case $1 in
       -h|--help)
         usage
+        ;;
+
+      -v|--verbosity)
+        verbosity=$2
+        shift 2
         ;;
 
       -T|--topology)
@@ -8406,8 +8628,23 @@ function _coverage
         shift 2
         ;;
 
+      -s|--seed)
+        seed=$2
+        shift 2
+        ;;
+
       -n|--dry-run)
         dryrun=1
+        shift
+        ;;
+
+      -w|--waves)
+        waves=1
+        shift
+        ;;
+
+      -d|--debug)
+        debug=1
         shift
         ;;
 
@@ -8431,20 +8668,25 @@ function _coverage
     esac
   done
 
+  if [[ $verbosity ]]; then
+    if ! [[ $verbosity =~ low|medium|high|debug ]]; then
+      echo -e "\e[1;31m-E-\e[0m Unknown verbosity level \e[1m$verbosity\e[0m\n"
+      usage 1
+    fi
+
+    verbosity=UVM_${verbosity^^}
+  fi
+
+  if [[ -z $topology ]] && (( ${#block[@]} == 0 )); then
+    echo -e "\e[1;31m-E-\e[0m No topology specified\n"
+    usage 1
+  fi
 
   for ((i=0; i<${#block[@]}; i++)); do
     for b in $(echo ${block[$i]} | sed 's/,/ /g'); do
       blocks[$((blocksid++))]=$b
     done
   done
-
-  if ((!${#blocks[@]})); then
-    echo -e "\e[1;31m-E-\e[0m No block specified\n"
-    usage 1
-  elif ((${#block[@]} > 1)); then
-    echo -e "\e[1;31m-E-\e[0m More than one block specified\n"
-    usage 1
-  fi
 
   for ((i=0; i<${#tag[@]}; i++)); do
     for t in $(echo ${tag[$i]} | sed 's/,/ /g'); do
@@ -8459,15 +8701,30 @@ function _coverage
   done
 
 
-  block_str=$(echo ${blocks[@]} | sed 's/ / -block /g; s/^/-block /') 
-  tag_str=$(echo ${tags[@]} | sed 's/ / -tag /g')
-  testcase_str=$(echo ${testcases[@]} | sed 's/ / -testcase /g; s/^/-testcase /')
-  count_str="-count $count"
+  block_str=$(if ((blocksid)); then echo ${blocks[@]} | sed -r 's/^| /&-block /g'; fi) 
+
+  if ((tagsid)); then
+    tag_str=$(echo ${tags[@]} | sed -r 's/^| /&-tag /g')
+  fi
+
+  if ((tcsid)); then
+    testcase_str=$(echo ${testcases[@]} | sed -r 's/^| /&-testcase /g')
+  fi
+
+  count_str=${count:+-count $count}
+  seed_str=${seed:+-seed $seed}
 
   cp -f $PROJ_BIN/Makefile .
   cp -f $PROJ_BIN/Makefile_clifden .
   cp -f $PROJ_DIR/scripts/gen_urg_vplan_cmd .
   
+  if [[ ${blocks[0]} =~ ([A-Z]+)_LONG ]]; then
+    topology=${BASH_REMATCH[1]}
+    length=LONG
+  else
+    topology=${blocks[0]}
+  fi
+
   sed -i 's%\$(CLIFDEN_BIN)/Makefile_clifden%'$PWD/Makefile_clifden% Makefile
   sed -i '
     s/\$(RGR_COUNT).*/$(RGR_COUNT)/
@@ -8475,6 +8732,19 @@ function _coverage
     /-rundir /d
     s%\S\+gen_urg_vplan_cmd%'$PWD'/gen_urg_vplan_cmd%
   ' Makefile_clifden
+
+  overwrites=$(grep ^RGR_OVERWRITES Makefile_clifden | tail -1 | cut -d= -f2-)
+  if ((waves)); then
+    overwrites=$(sed -r 's/ /&DUMP_FSDB=yes /2; s/"/\\&/g; s/\$\(TOPOLOGY\)/'${topology^^}'/' <<<$overwrites)
+  fi
+
+  if [[ $verbosity ]]; then
+    overwrites=$(sed -r 's/ /&UVM_VERBOSITY='$verbosity' /2' <<<$overwrites)
+  fi
+
+  if (( $debug )); then
+    overwrites=$(sed -r 's/ /&USER_PLUSARGS+=+DEBUG /2' <<<$overwrites)
+  fi
 
   urg_cmd=$(readlink -m urg.cmd)
   vplan_cmd=$(readlink -m vplan.cmd)
@@ -8484,15 +8754,16 @@ function _coverage
     s%\S+_urg.cmd%'$urg_cmd'%
     s%\S+_vplan.cmd%'$vplan_cmd'%
     s%\$\{CLIFDEN_RUN\}/\$\{RGR_DIR\}%'$PWD'%
-    s%\$\{TOPOLOGY\}/%'${blocks[0]}/'%
   ' gen_urg_vplan_cmd
 
-  make_cmd="make run_rgr  RGR_REGTAG=COV_$(date +%Y%m%d_%H%M%S) TOPOLOGY=$topology  \
-                          ${block_str:+RGR_TST_GRP=\"$block_str\"}                  \
-                          ${tag_str:+TAG=\"$tag_str\"}                              \
-                          ${count:+RGR_COUNT=\"$count_str\"}                        \
-                          ${testcase_str:+RGR_EMAIL=\"$testcase_str\"}              \
-                          URG_CMD=$urg_cmd VPLAN_CMD=$vplan_cmd                     \
+
+  make_cmd="make run_rgr  RGR_REGTAG=COV_$(date +%Y%m%d_%H%M%S) TOPOLOGY=${topology^^} LENGTH=$length   \
+                          ${block_str:+RGR_TST_GRP=\"$block_str $testcase_str $seed_str\"}              \
+                          ${tag_str:+RGR_TAG=\"$tag_str\"}                                              \
+                          ${count:+RGR_COUNT=\"$count_str\"}                                            \
+                          ${waves:+RGR_OVERWRITES=\"$overwrites\"}                                      \
+                          RGR_EMAIL=\"-email $USER\"                                                    \
+                          URG_CMD=$urg_cmd VPLAN_CMD=$vplan_cmd                                         \
                           "
 
   if ((dryrun)); then
@@ -8503,12 +8774,12 @@ function _coverage
 }
 
 
-# Function: samples_2xls
+# Function: samples_compare_2xls
 #
-function _samples_2xls
+function _samples_compare_2xls
 {
   function usage {
-    echo -e "\e[1mUsage:\e[0m samples_2xls [options] [<directory>...] [<log>...]"
+    echo -e "\e[1mUsage:\e[0m samples_compare_2xls [options] [<directory>...] [<log>...]"
 
     echo
     echo -e "\e[1mDescription:\e[0m"
@@ -8529,6 +8800,9 @@ function _samples_2xls
     echo "        Generate Excel file(s) only for specified slice"
     echo "        If not specified, defaults to all slices"
     echo
+    echo "  --max, -m <count>"
+    echo "        Maximum number of samples to include in Excel file(s)"
+    echo
     echo -e "\e[1mArguments\e[0m"
     echo "  <directory>...    Optional positional directory arguments to specify the directories to work on."
     echo "                    If not specified, and no run.log is provided either, the current directory is used."
@@ -8544,14 +8818,14 @@ function _samples_2xls
   }
 
 
-  opt=$(getopt -a -oh,d,c,s: -lhelp,dp,datapth,cal,calibration,slice: -- "$@")
+  opt=$(getopt -a -oh,d,c,s:,m: -lhelp,dp,datapth,cal,calibration,slice:,max: -- "$@")
   if (($?)); then
     usage 1
   fi
 
   eval set -- $opt
 
-  all_slices=1 dp_cal=1
+  all_slices=1 dp_cal=1 max=10000
 
   while (($#)); do
     case $1 in
@@ -8574,6 +8848,11 @@ function _samples_2xls
       -s|--slice)
         slice=$2
         all_slices=
+        shift 2
+        ;;
+
+      -m|--max)
+        max=$2
         shift 2
         ;;
 
@@ -8637,11 +8916,22 @@ function _samples_2xls
     for k in $(seq 0 3); do 
       if ((all_slices || slice == k)); then
         if ((dp_cal || dp)); then
-          simenv merge_csv -c3 -x2 -o dp_$k.csv  sbs_i_model_$k.csv sbs_i_design_$k.csv sbs_i_check_$k.csv
+          bsub -I -R "select[type==X86_64 && ostype==rhelws79]" simenv merge_csv -c3 -x2 -o dp_$k.csv  sbs_i_model_$k.csv sbs_i_design_$k.csv sbs_i_check_$k.csv
         fi
 
         if ((dp_cal || cal)); then
-          simenv merge_csv -c4 -x2 -o cal_$k.csv cal_dbg_model_$k.csv cal_model_$k.csv   cal_design_$k.csv   cal_check_$k.csv
+          if (( max )); then
+            rm -f cal_dbg_model_short_$k.csv cal_model_short_$k.csv cal_design_short_$k.csv cal_check_short_$k.csv
+
+            head -$max cal_dbg_model_$k.csv > cal_dbg_model_short_$k.csv 
+            head -$max cal_model_$k.csv > cal_model_short_$k.csv
+            head -$max cal_design_$k.csv > cal_design_short_$k.csv
+            head -$max cal_check_$k.csv > cal_check_short_$k.csv
+          fi
+
+          rm -f cal_$k.csv
+
+          bsub -I -R "select[type==X86_64 && ostype==rhelws79]" simenv merge_csv -c4 -x2 -o cal_$k.csv cal_dbg_model${max:+_short}_$k.csv cal_model${max:+_short}_$k.csv   cal_design${max:+_short}_$k.csv   cal_check${max:+_short}_$k.csv
         fi
       fi
     done
@@ -8655,6 +8945,189 @@ function _samples_2xls
     fi
 
     popd > /dev/null
+  done
+}
+
+# Function: samples_2xls
+#
+function _samples_2xls
+{
+  function usage {
+    echo -e "\e[1mUsage:\e[0m samples_2xls [options] [<directory>...] [<log>...]"
+
+    echo
+    echo -e "\e[1mDescription:\e[0m"
+    echo "  Convert datapath and calibration samples and checks to xls format"
+
+    echo
+    echo -e "\e[1mOptions:\e[0m"
+    echo "  --help, -h"
+    echo "        Display this help message"
+
+    echo "  --datapath, --dp , -d"
+    echo "        Generate datapath Excel file(s)"
+    echo 
+    echo "  --calibration, --cal, -c"
+    echo "        Generate calibration Excel file(s)"
+    echo
+    echo "  --slice, -s <slice>"
+    echo "        Generate Excel file(s) only for specified slice"
+    echo "        If not specified, defaults to all slices"
+    echo
+    echo "  --tail, -t <count>"
+    echo "        Maximum number of samples to include in Excel file(s) from the end"
+    echo
+    echo "  --dbg"
+    echo "        Add cal_dbg_model* to cal_samples"
+    echo
+    echo -e "\e[1mArguments\e[0m"
+    echo "  <directory>...    Optional positional directory arguments to specify the directories to work on."
+    echo "                    If not specified, and no run.log is provided either, the current directory is used."
+    echo "                    May also be provided from stdin."
+    
+    echo
+    echo "  <log>...          Optional positional log arguments to specify the log files to work on."
+    echo "                    May also be provided from stdin."
+    echo
+
+
+    exit ${1:-0}
+  }
+
+
+  opt=$(getopt -a -oh,d,c,s:,t: -lhelp,dp,datapth,cal,calibration,slice:,dbg,tail: -- "$@")
+  if (($?)); then
+    usage 1
+  fi
+
+  eval set -- $opt
+
+  all_slices=1 dp_cal=1
+
+  while (($#)); do
+    case $1 in
+      -h|--help)
+        usage
+        ;;
+
+      --datapath|--dp|-d)
+        dp=1
+        dp_cal=0
+        shift
+        ;;
+
+      --calibration|--cal|-c)
+        cal=1
+        dp_cal=0
+        shift
+        ;;
+
+      -s|--slice)
+        slice=$2
+        all_slices=
+        shift 2
+        ;;
+
+      -t|--tail)
+        tailc=$2
+        shift 2
+        ;;
+
+      --dbg)
+        dbg=1
+        shift
+        ;;
+
+      --) shift
+          ;;
+
+      -*) echo -e "\e[1;31m-E-\e[0m Unknown option \e[1m$1\e[0m"
+          usage 1
+          ;;
+
+      *)  posarg[$((posargs_id++))]=$1 
+          shift
+          ;;
+
+      esac
+  done
+   
+  if [[ -p /dev/stdin ]]; then
+    posarg+=($(cat))
+  fi
+
+  logs=($(for item in "${posarg[@]}"; do
+    if [[ -f $item ]]; then
+      if [[ $item =~ .*run.log$ ]]; then
+        if [[ ! -f $item ]]; then
+          echo -e "\e[1;31m-E-\e[0m File \e[1m$item\e[0m does not exist"
+          continue
+        fi
+
+        echo $item
+      else
+        echo -e "\e[1;31m-E-\e[0m File \e[1m$item\e[0m is not a run.log" 
+        continue
+      fi
+    else
+      # Should be a directory
+      if [[ ! -d $item ]]; then
+        echo -e "\e[1;31m-E-\e[0m Directory or File \e[1m$item\e[0m does not exist" 1>&2
+        continue
+      else
+        simenv log $item
+      fi
+    fi
+
+  done | simenv uniquify))
+
+  if ((!${#logs[@]})); then
+    logs=($(simenv log))
+  fi
+
+  # echo all_slices=$all_slices  slice=$slice dp=$dp cal=$cal
+
+  for log in "${logs[@]}"; do
+    crundir=$(dirname $log)
+    ctestdir=$(basename $crundir)
+
+    echo "Processing $crundir"
+
+    pushd $crundir > /dev/null
+
+    for k in $(seq 0 3); do 
+      if ((all_slices || slice == k)); then
+        if ((dp_cal || dp)); then
+          bsub -I -R "select[type==X86_64 && ostype==rhelws79]" simenv merge_csv -c2 -x2 -o dp_samples_$k.csv  sbs_i_model_$k.csv sbs_i_design_$k.csv
+        fi
+
+        if ((dp_cal || cal)); then
+          tblcnt=$(if ((dbg)); then echo 3; else echo 2; fi)
+
+          if (( tailc )); then
+            cat <(head -1 cal_model_$k.csv ) <(tail -$tailc cal_model_$k.csv ) > cal_model_tail_$k.csv
+            cat <(head -1 cal_design_$k.csv) <(tail -$tailc cal_design_$k.csv) > cal_design_tail_$k.csv
+          fi
+
+          simenv merge_csv -c$tblcnt -x2 -o ${slice:+${ctestdir}_}cal_samples_$k.csv ${dbg:+cal_dbg_model_$k.csv} cal_model${tailc:+_tail}_$k.csv   cal_design${tailc:+_tail}_$k.csv
+
+          if (( tailc )); then
+            rm -f cal_model_tail_$k.csv cal_design_tail_$k.csv
+          fi
+        fi
+      fi
+    done
+
+    if ((dp_cal || dp)); then
+      simenv csv_2xls   ${all_slices:+-m -o ${ctestdir}_dp_samples_$(date +%Y%m%d_%H%M).xlsx dp_samples_0.csv  dp_samples_1.csv  dp_samples_2.csv  dp_samples_3.csv} ${slice:+${ctestdir}_dp_samples_$slice.csv}
+    fi
+
+    if ((dp_cal || cal)); then
+      simenv csv_2xls   ${all_slices:+-m -o ${ctestdir}_cal_samples_$(date +%Y%m%d_%H%M).xlsx cal_samples_0.csv cal_samples_1.csv cal_samples_2.csv cal_samples_3.csv} ${slice:+${ctestdir}_cal_samples_$slice.csv}
+    fi
+
+    popd > /dev/null
+    echo
   done
 }
 
@@ -9080,7 +9553,7 @@ function _samples_status
           fi
         done | xargs echo $t discarded | sed 's/ /,/2g'
       done
-    ) | sed -r '/slice|count/! s/^/opb /' | simenv transpose_csv | sed -r 's/([^,]+,[^,]+,[^,]+),([^,]+,[^,]+,[^,]+),([^,]+),([^,]+)/\1,\3,\4,\2/' > opb_tmp.csv 
+    ) | sed -r '/slice|count/! s/^/opb /' | simenv transpose_csv | sed -r 's/([^,]+,[^,]+,[^,]+),([^,]+,[^,]+,[^,]+),([^,]+),([^,]+)/\1,\3,\4,\2/' > opb.csv 
 
 
     #
@@ -9328,3 +9801,287 @@ function _matlab_cfg_table
 }
 
 
+# Function: csa_compile
+#
+function _csa_compile
+{
+  cd $PROJ_DIR/models/python/csa
+
+  so_status=$(icmp4 status csa.*.so |& head -1)
+  
+  if (( $(grep -Ec "no file\(s\) to reconcile" <<<$so_status) )); then
+    icmp4 edit csa.*.so
+  fi
+
+  echo Compiling csa.cpp..
+  g++ -O3 -Wall -fPIC -shared -std=c++11 $(python3 -m pybind11 --includes) csa.cpp -o csa$(python3-config --extension-suffix)
+  echo Done.
+}
+
+# Function: tm_compile
+#
+function _tm_compile
+{
+  cd $PROJ_DIR/models/python/tm
+
+  so_status=$(icmp4 status tm.*.so |& head -1)
+  
+  if (( $(grep -Ec "no file\(s\) to reconcile" <<<$so_status) )); then
+    icmp4 edit tm.*.so
+  fi
+
+  echo Compiling tm.cpp..
+  g++ -O3 -Wall -fPIC -shared -std=c++11 $(python3 -m pybind11 --includes) tm.cpp -o tm$(python3-config --extension-suffix)
+  echo Done.
+}
+
+# Function: lint
+#
+#
+function _lint
+{
+  function usage
+  {
+    echo -e "\e[1mUsage:\e[0m lint [options] <topology>"
+    echo
+    echo -e "\e[1mOptions:\e[0m"
+    echo "  --help, -h    Display this help message"
+    echo 
+    echo -e "\e[1mArguments\e[0m"
+    echo "  <topology>    topology to run o. Either adc or dac"
+    echo
+
+    exit ${1:-0}
+  }
+
+  opts=$(getopt -a -oh -lhelp -- "$@")
+  if (($?)); then
+    exit 2
+  fi
+
+  eval set -- $opts
+
+  while (($#)); do
+    case $1 in
+      -h|--help)
+        usage
+        ;;
+
+      --) shift
+          ;;
+
+      -*) echo -e "\e[1;31m-E-\e[0m Unsupported option: $1\n"
+          usage 1
+          ;;
+
+      *) topology=$1
+        if [[ $topology =~ ^(adc|dac)$ ]]; then
+          topology=$1
+          shift
+        else
+          echo -e "\e[1;31m-E\e[0m Unsupported \e[1m$topology\e[0m topology\n"
+          usage 1
+        fi
+        ;;
+    esac
+  done
+
+  if [[ -z $topology ]]; then
+    echo -e "\e[1;31m-E-\e[0m The topology argument is required!\n" 
+    usage 1
+  fi
+
+  bsub -I -R "rusage[mem=50000]" -R "select[type==X86_64 && (ostype==rhelws77)]" make -f $PROJ_RUN/Makefile run_uvm_linter TOPOLOGY=${topology^^}
+}
+
+
+# Function: maxavgs
+#
+#
+function _maxavgs
+{
+  function usage
+  {
+    echo -e "\e[1mUsage:\e[0m maxavgs [options] <log>"
+    echo
+    echo -e "\e[1mOptions:\e[0m"
+    echo "  --help, -h    Display this help message"
+    echo 
+    echo -e "\e[1mArguments\e[0m"
+    echo "  <log>        log file to process, or /dev/stdin if not specified"
+    echo
+
+    exit ${1:-0}
+  }
+
+  opts=$(getopt -a -oh -lhelp -- "$@")
+  if (($?)); then
+    exit 2
+  fi
+
+  eval set -- $opts
+
+  while (($#)); do
+    case $1 in
+      -h|--help)
+        usage
+        ;;
+
+      --) shift
+          ;;
+
+      -*) echo -e "\e[1;31m-E-\e[0m Unsupported option: $1\n"
+          usage 1
+          ;;
+
+      *) log=$(readlink -e $1)
+        shift
+
+        if [[ ! -f $log ]]; then
+          echo -e "\e[1;31m-E-\e[0m The log argument does not exist\n" 
+          usage 1
+        fi
+        ;;
+
+    esac
+  done
+
+  if [[ -z $log ]]; then
+    if [[ ! -p /dev/stdin ]]; then
+      echo -e "\e[1;31m-E-\e[0m The log argument is required!\n" 
+      usage 1
+    fi
+
+    log=$(cat | head -1 | xargs readlink -e)
+
+    if [[ ! -f $log ]]; then
+      echo -e "\e[1;31m-E-\e[0m The log argument does not exist!\n" 
+      usage 1
+    fi
+  fi
+
+  csvname=maxavgs_$(date +%Y%m%d_%H%M%S).csv
+  rm -f maxavgs_*.*
+  grep csv:maxavgs $log | cut -d: -f3 | uniq -c | grep -o '\S\+$' > $csvname
+  simenv csv_2xls $csvname
+}
+
+# Function: runtime
+#
+#
+function _runtime
+{
+  function usage
+  {
+    echo -e "\e[1mUsage:\e[0m runtime [options] [<log>...]"
+    echo
+    echo -e "\e[1mOptions:\e[0m"
+    echo "  --help, -h    Display this help message"
+    echo 
+    echo -e "\e[1mArguments\e[0m"
+    echo "  <log>        log file to process, or /dev/stdin if not specified"
+    echo
+
+    exit ${1:-0}
+  }
+
+  opts=$(getopt -a -oh -lhelp -- "$@")
+  if (($?)); then
+    exit 2
+  fi
+
+  eval set -- $opts
+
+  while (($#)); do
+    case $1 in
+      -h|--help)
+        usage
+        ;;
+
+      --) shift
+          ;;
+
+      -*) echo -e "\e[1;31m-E-\e[0m Unsupported option: $1\n"
+          usage 1
+          ;;
+
+      *) logs[${#logs[@]}]=$(readlink -e $1)
+        shift
+        ;;
+
+    esac
+  done
+
+  # Check if /dev/stdin has data, if so, assuming each line is a log file
+  if [[ -p /dev/stdin ]]; then
+    while read line; do
+      logs[${#logs[@]}]=$(readlink -e $line)
+    done
+  fi
+
+  # Check if all logs entries are not empty and correspond to existing files
+  # Skip the entry is empty
+  # Print an error message if the entry does not correspond to an existing file
+  for ((i = 0; i < ${#logs[@]}; i++)); do
+    if [[ -z ${logs[$i]} ]]; then
+      continue
+    fi
+    if [[ ! -f ${logs[$i]} ]]; then
+      echo -e "\e[1;31m-E-\e[0m The log ${logs[$i]} does not exist!\n" 
+      usage 1
+    fi
+
+    logfiles[${#logfiles[@]}]=${logs[$i]}
+  done
+
+  # Print an error and exit if no log files were found
+  if [[ ${#logfiles[@]} -eq 0 ]]; then
+    echo -e "\e[1;31m-E-\e[0m No existing log files were found!\n" 
+    usage 1
+  fi
+  
+  # For each log file get its modification time, diff it with the CRFLOG and print the result
+  # in the format: <log file> <time diff in seconds expressed in days/hours/minutes/seconds>
+  # if there are more than 1 log file.
+  # But in the case of only 1 log file, just print the time diff in seconds expressed in days/hours/minutes/seconds
+  for log in ${logfiles[@]}; do
+    crflog=$(simenv testcrfdir -a $log)/crf.log
+    #echo "crflog: <$crflog>"
+    trundir=$(simenv testrundir $log)
+    jobid=$(grep ": $trundir" $crflog | grep -Eo '[[:digit:]]+:' | cut -d: -f1)
+    user=$(simenv testuser $log)
+    # echo "trundir: <$trundir>  user: <$user>"
+    jobtime=$(bjobs -u ${user:-$USER} -o submit_time $jobid |& tail -1)
+    jobstat=$(bjobs -u ${user:-$USER} -o stat $jobid |& tail -1)
+
+    # echo "JOBID: <$jobid> JOBTIME: <$jobtime> JOBSTAT: <$jobstat>"
+    # if jobtime contains "is not found", then either it doesn't exist or has completed
+    if [[ $jobtime =~ "is not found" ]]; then
+      jobstat=DONE
+      tailend=$(tail $log | grep -Po 'Turnaround time :\s+\K\d+(?= sec)' $log)
+
+      if [[ -z $tailend ]]; then
+        dhms="N/A"
+      else
+        dhms=$(simenv seconds $tailend)
+      fi
+    else
+      reftime=$(date -d "$jobtime" +%s)
+
+      #echo "REFTIME: <$reftime>"
+
+      log_time=$(stat -c %Y $log)
+      #echo "log_time: <$log_time>"
+
+      time_diff=$(($log_time - $reftime))
+      dhms=$(simenv seconds $time_diff)
+    fi
+
+    #echo "log_time: <$log_time> reftime: <$reftime> time_diff: <$time_diff>"
+    if [[ ${#logfiles[@]} -gt 1 ]]; then
+      echo -e "$dhms${jobstat:+\t$jobstat}\t$log"
+    else
+      echo -e "$dhms${jobstat:+\t$jobstat}"
+    fi
+  done
+}
